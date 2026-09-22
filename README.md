@@ -25,6 +25,8 @@ Controle físico de materiais de via permanente: inventário do pátio, entradas
 | Folha de contagem | aba Estoque | Lista dos materiais com espaço em branco para anotar a contagem à caneta no pátio |
 | PDF do período em aberto | aba Medições | Prévia da medição antes de fechar |
 | PDF (por medição) | aba Medições | Relatório assinável do período fechado |
+| PDF do saldo atual | aba Backup | Material, unidade, data da última contagem e saldo atual |
+| PDF do histórico | aba Backup | Lançamentos do período escolhido na aba Histórico, com ativo e responsável |
 | Saldo atual (Excel) | aba Backup | Material, unidade e saldo atual |
 | Histórico completo (Excel) | aba Backup | Todos os lançamentos, com ativo, balizamento e responsável |
 | Excel (por medição) | aba Medições | Resumo do período, consumo por ativo e lançamentos |

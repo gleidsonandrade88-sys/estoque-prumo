@@ -62,7 +62,7 @@
   @media print {
     body { background: #fff !important; color: #000 !important; padding: 0; margin: 0; font-family: Arial, Helvetica, sans-serif; }
     .dashboard { display: none !important; }
-    #relatorio { display: block !important; color: #000; }
+    #relatorio { display: block !important; color: #000; box-sizing: border-box; padding: 0 2px; }
     #relatorio .cab { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 14px; }
     #relatorio .empresa { font-size: 13pt; font-weight: bold; letter-spacing: .5px; }
     #relatorio .empresa small { display: block; font-size: 8pt; font-weight: normal; letter-spacing: 0; }
@@ -232,6 +232,14 @@
         <input type="file" id="fileImport" accept=".json,application/json" class="hidden">
       </label>
     </div>
+
+    <h2>Gerar PDF</h2>
+    <div class="linha-acoes">
+      <button class="btn btn-info" id="btnPdfSaldo">🖨 PDF do saldo atual</button>
+      <button class="btn btn-info" id="btnPdfHist">🖨 PDF do histórico</button>
+      <button class="btn btn-info" id="btnPdfInv2">🖨 PDF do inventário</button>
+    </div>
+    <p class="muted">O histórico sai pelo período escolhido na aba Histórico. Na janela de impressão, escolha <strong>Salvar como PDF</strong>.</p>
     <p class="muted" id="infoBackup"></p>
   </section>
 </div>
@@ -697,6 +705,42 @@
     return mov;
   }
 
+  function pdfSaldo() {
+    const mats = Object.keys(db.materiais);
+    if (!mats.length) return alert('Cadastre os materiais antes de gerar o PDF.');
+    const atual = saldos(), inv = invPorMaterial();
+    const linhas = mats.map(m => `<tr><td>${esc(m)}</td><td>${esc(db.materiais[m].unidade)}</td>
+        <td>${inv[m] ? fmtData(inv[m].data) : '—'}</td>
+        <td class="num"><strong>${fmt(atual[m] || 0)}</strong></td></tr>`).join('');
+    const corpo = `<table><thead><tr><th>Material</th><th>Un.</th><th>Última contagem</th><th class="num">Saldo atual</th></tr></thead>
+      <tbody>${linhas}</tbody></table>
+      <p class="obs">${mats.length} material(is) cadastrado(s).</p>`;
+    imprimir(moldura('Saldo de Estoque', `Posição em ${fmtData(hoje())}`, corpo,
+      ['Responsável pelo estoque', 'Encarregado de via']));
+  }
+
+  function pdfHistorico() {
+    if (!db.eventos.length) return alert('Nenhum lançamento registrado.');
+    const p = periodoSelecionado(), ft = $('fTipo').value, fm = $('fMaterial').value;
+    const lista = ordenados().filter(ev => noPeriodo(ev, p) && (!ft || ev.tipo === ft) && (!fm || ev.material === fm));
+    if (!lista.length) return alert('Nenhum lançamento no filtro selecionado da aba Histórico.');
+    const linhas = lista.map(ev => `<tr><td>${fmtData(ev.data)}</td><td>${TIPO_LABEL[ev.tipo] || esc(ev.tipo)}</td>
+      <td>${esc(ev.material)}</td><td class="num">${fmt(ev.qtd)} ${esc(db.materiais[ev.material]?.unidade || '')}</td>
+      <td>${esc(ev.ativo || '—')}</td><td>${esc(ev.balizamento || '—')}</td>
+      <td>${esc(ev.responsavel)}${ev.matricula && ev.matricula !== '-' ? ' (' + esc(ev.matricula) + ')' : ''}</td>
+      <td>${esc(ev.obs || '')}</td></tr>`).join('');
+    const filtros = [ft ? 'tipo: ' + (TIPO_LABEL[ft] || ft) : '', fm ? 'material: ' + fm : ''].filter(Boolean).join(' · ');
+    const corpo = `<table><thead><tr><th>Data</th><th>Tipo</th><th>Material</th><th class="num">Qtd</th>
+      <th>Ativo</th><th>Balizamento</th><th>Responsável</th><th>Obs.</th></tr></thead>
+      <tbody>${linhas}</tbody></table>
+      <p class="obs">${lista.length} lançamento(s)${filtros ? ' · ' + esc(filtros) : ''}.</p>`;
+    imprimir(moldura('Histórico de Lançamentos', `Período: ${descPeriodo(p)}`, corpo,
+      ['Responsável pelo estoque', 'Encarregado de via']));
+  }
+
+  $('btnPdfSaldo').onclick = pdfSaldo;
+  $('btnPdfHist').onclick = pdfHistorico;
+  $('btnPdfInv2').onclick = pdfInventario;
   $('btnPdfInv').onclick = pdfInventario;
   $('btnPdfFolha').onclick = pdfFolhaContagem;
   $('btnPdfAberto').onclick = () => pdfMedicao(null);
