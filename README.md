@@ -19,11 +19,17 @@ Controle físico de materiais de via permanente: inventário do pátio, entradas
 
 ## Relatórios
 
-| Botão | Conteúdo |
-|---|---|
-| Saldo atual (Excel) | Material, unidade e saldo atual |
-| Histórico completo (Excel) | Todos os lançamentos, com ativo, balizamento e responsável |
-| Relatório (por medição) | Resumo do período, consumo por ativo e lançamentos |
+| Botão | Onde | Conteúdo |
+|---|---|---|
+| PDF do inventário | aba Estoque | Contagem por material, data, movimentos do período e saldo atual, com campos de assinatura |
+| Folha de contagem | aba Estoque | Lista dos materiais com espaço em branco para anotar a contagem à caneta no pátio |
+| PDF do período em aberto | aba Medições | Prévia da medição antes de fechar |
+| PDF (por medição) | aba Medições | Relatório assinável do período fechado |
+| Saldo atual (Excel) | aba Backup | Material, unidade e saldo atual |
+| Histórico completo (Excel) | aba Backup | Todos os lançamentos, com ativo, balizamento e responsável |
+| Excel (por medição) | aba Medições | Resumo do período, consumo por ativo e lançamentos |
+
+Os PDFs saem pela impressão do navegador: em *Destino*, escolha **Salvar como PDF** (no celular, **Imprimir → Salvar como PDF**). Não depende de internet nem de programa instalado.
 
 Os arquivos saem em CSV separado por ponto e vírgula, com acentuação preservada — abrem direto no Excel em português.
 

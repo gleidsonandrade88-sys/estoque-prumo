@@ -57,6 +57,33 @@
   .linha-acoes { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .hidden { display: none !important; }
 
+  /* ---------- relatorio para PDF (impressao) ---------- */
+  #relatorio { display: none; }
+  @media print {
+    body { background: #fff !important; color: #000 !important; padding: 0; margin: 0; font-family: Arial, Helvetica, sans-serif; }
+    .dashboard { display: none !important; }
+    #relatorio { display: block !important; color: #000; }
+    #relatorio .cab { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 14px; }
+    #relatorio .empresa { font-size: 13pt; font-weight: bold; letter-spacing: .5px; }
+    #relatorio .empresa small { display: block; font-size: 8pt; font-weight: normal; letter-spacing: 0; }
+    #relatorio .emissao { font-size: 8pt; text-align: right; }
+    #relatorio h1 { font-size: 13pt; margin: 0 0 2px; color: #000; text-transform: none; letter-spacing: 0; text-align: left; }
+    #relatorio .sub { font-size: 9pt; margin: 0 0 12px; color: #333; }
+    #relatorio h2 { font-size: 10pt; margin: 16px 0 4px; color: #000; border: none; padding: 0; page-break-after: avoid; }
+    #relatorio table { width: 100%; border-collapse: collapse; font-size: 8.5pt; margin-bottom: 10px; }
+    #relatorio th, #relatorio td { border: 1px solid #555; padding: 4px 6px; text-align: left; white-space: normal; background: #fff; color: #000; }
+    #relatorio th { background: #e8e8e8 !important; font-weight: bold; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    #relatorio td.num, #relatorio th.num { text-align: right; }
+    #relatorio tr { page-break-inside: avoid; }
+    #relatorio thead { display: table-header-group; }
+    #relatorio .vazio { height: 18px; }
+    #relatorio .obs { font-size: 8pt; color: #333; margin: 4px 0 0; }
+    #relatorio .assin { display: flex; gap: 24px; margin-top: 38px; page-break-inside: avoid; }
+    #relatorio .assin div { flex: 1; border-top: 1px solid #000; padding-top: 4px; font-size: 8pt; text-align: center; }
+    #relatorio .rodape { margin-top: 18px; border-top: 1px solid #999; padding-top: 4px; font-size: 7.5pt; color: #555; }
+    @page { size: A4; margin: 14mm 12mm; }
+  }
+
   @media (max-width: 640px) {
     body { padding: 8px; } .dashboard { padding: 14px; }
     .cards, .grid-2, .grid-3, .filtros { grid-template-columns: 1fr; }
@@ -106,6 +133,13 @@
       <div><label>Qtd contada</label><input type="number" id="novoQtd" value="0" step="0.01" min="0"></div>
       <div><button class="btn btn-laranja" id="btnNovo">➕ Adicionar</button></div>
     </div>
+
+    <h2>Gerar PDF</h2>
+    <div class="linha-acoes">
+      <button class="btn btn-info" id="btnPdfInv">🖨 PDF do inventário</button>
+      <button class="btn btn-info" id="btnPdfFolha">🖨 Folha de contagem (em branco)</button>
+    </div>
+    <p class="muted">Abre a janela de impressão do navegador. Em Destino, escolha <strong>Salvar como PDF</strong> (no celular: <strong>Imprimir → Salvar como PDF</strong>).</p>
   </section>
 
   <!-- LANÇAR -->
@@ -166,6 +200,9 @@
       <div><label>Nome da medição</label><input type="text" id="nomeMedicao" placeholder="Ex.: MEDIÇÃO 09/2026"></div>
       <div><label>Data de corte</label><input type="date" id="dataMedicao"></div>
       <div><button class="btn btn-laranja" id="btnFechar">🔒 Fechar medição</button></div>
+    </div>
+    <div class="linha-acoes" style="margin-top:10px">
+      <button class="btn btn-info" id="btnPdfAberto">🖨 PDF do período em aberto</button>
     </div>
 
     <h2>Saídas do período em aberto por ativo</h2>
@@ -357,7 +394,8 @@
       const ult = i === db.fechamentos.length - 1;
       return `<tr><td><strong>${esc(fc.nome)}</strong></td><td>${p.de ? 'após ' + fmtData(p.de) : 'início'} até ${fmtData(p.ate)}</td>
         <td class="num">${n}</td><td class="linha-acoes">
-          <button class="btn btn-success btn-sm" data-csvmed="${i}">⬇ Relatório</button>
+          <button class="btn btn-success btn-sm" data-csvmed="${i}">⬇ Excel</button>
+          <button class="btn btn-info btn-sm" data-pdfmed="${i}">🖨 PDF</button>
           ${ult ? `<button class="btn btn-danger" data-reabrir="${i}">Reabrir</button>` : ''}</td></tr>`;
     }).reverse().join('') || '<tr><td colspan="4" class="muted">Nenhuma medição fechada ainda.</td></tr>';
   }
@@ -468,7 +506,9 @@
 
   $('tabelaMedicoes').onclick = e => {
     const c = e.target.closest('[data-csvmed]'), r = e.target.closest('[data-reabrir]');
+    const pd = e.target.closest('[data-pdfmed]');
     if (c) exportarMedicao(+c.dataset.csvmed);
+    if (pd) pdfMedicao(+pd.dataset.pdfmed);
     if (r && confirm('Reabrir esta medição? Os lançamentos voltam para o período em aberto.')) { db.fechamentos.pop(); salvar(); render(); }
   };
 
@@ -496,10 +536,11 @@
       if (ev.tipo in mov[ev.material]) mov[ev.material][ev.tipo] += ev.qtd; });
     let s = '\uFEFF' + cel('PRUMO ENGENHARIA - ' + fc.nome) + '\n';
     s += `Periodo;${p.de ? 'apos ' + fmtData(p.de) : 'inicio'} ate ${fmtData(p.ate)}\n\n`;
-    s += 'RESUMO POR MATERIAL\nMaterial;Unidade;Saldo inicial;Entradas;Saidas;Retornos;Saldo final\n';
+    s += 'RESUMO POR MATERIAL\nMaterial;Unidade;Saldo inicial;Invent/Ajuste;Entradas;Saidas;Retornos;Saldo final\n';
     const mats = new Set([...Object.keys(db.materiais), ...Object.keys(fc.saldos)]);
     mats.forEach(m => { const x = mov[m] || { Entrada:0, Saida:0, Retorno:0 };
-      s += [m, db.materiais[m]?.unidade || '', num(ini[m]), num(x.Entrada), num(x.Saida), num(x.Retorno), num(fc.saldos[m])].map(cel).join(';') + '\n'; });
+      const aj = Math.round(((fc.saldos[m] || 0) - ((ini[m] || 0) + x.Entrada - x.Saida + x.Retorno)) * 1000) / 1000;
+      s += [m, db.materiais[m]?.unidade || '', num(ini[m]), num(aj), num(x.Entrada), num(x.Saida), num(x.Retorno), num(fc.saldos[m])].map(cel).join(';') + '\n'; });
     s += '\nCONSUMO POR ATIVO (saidas - retornos)\nAtivo;Balizamento;Material;Quantidade\n';
     porAtivo(p).forEach(l => s += [l.ativo, l.baliza, l.material, num(l.qtd)].map(cel).join(';') + '\n');
     s += '\nLANCAMENTOS\n' + linhasMov(p);
@@ -532,6 +573,134 @@
   };
 
   // abas
+  // ---------- relatórios em PDF (impressão do navegador) ----------
+  const EMPRESA = 'PRUMO ENGENHARIA';
+  function agora() {
+    const d = new Date(), z = n => String(n).padStart(2, '0');
+    return `${z(d.getDate())}/${z(d.getMonth()+1)}/${d.getFullYear()} às ${z(d.getHours())}:${z(d.getMinutes())}`;
+  }
+  function moldura(titulo, subtitulo, corpo, assinaturas) {
+    const assin = (assinaturas || []).map(a => `<div>${esc(a)}</div>`).join('');
+    return `<div class="cab">
+        <div class="empresa">${EMPRESA}<small>Via Permanente · Controle de Estoque</small></div>
+        <div class="emissao">Emitido em ${agora()}</div>
+      </div>
+      <h1>${esc(titulo)}</h1>
+      <p class="sub">${subtitulo}</p>
+      ${corpo}
+      ${assin ? `<div class="assin">${assin}</div>` : ''}
+      <div class="rodape">Documento gerado pelo sistema de controle de estoque da ${EMPRESA}. Conferência física sob responsabilidade da equipe de campo.</div>`;
+  }
+  function imprimir(html) {
+    const alvo = $('relatorio');
+    alvo.innerHTML = html;
+    const volta = () => { alvo.innerHTML = ''; window.removeEventListener('afterprint', volta); };
+    window.addEventListener('afterprint', volta);
+    setTimeout(() => window.print(), 60);
+  }
+  function descPeriodo(p) {
+    const ini = p.de ? 'após ' + fmtData(p.de) : 'início do controle';
+    return `${ini} até ${p.ate ? fmtData(p.ate) : fmtData(hoje())}`;
+  }
+  function invPorMaterial() {
+    const r = {};
+    ordenados().forEach(ev => { if (ev.tipo === 'Inventario') r[ev.material] = ev; });
+    return r;
+  }
+  function movDoPeriodo(p) {
+    const mov = {};
+    Object.keys(db.materiais).forEach(m => mov[m] = { Entrada:0, Saida:0, Retorno:0 });
+    db.eventos.forEach(ev => {
+      if (!noPeriodo(ev, p) || !mov[ev.material] || !(ev.tipo in mov[ev.material])) return;
+      mov[ev.material][ev.tipo] += ev.qtd;
+    });
+    return mov;
+  }
+
+  function pdfInventario() {
+    const mats = Object.keys(db.materiais);
+    if (!mats.length) return alert('Cadastre os materiais antes de gerar o PDF.');
+    const inv = invPorMaterial(), p = periodoAberto(), mov = movDoPeriodo(p), atual = saldos();
+    const semContagem = mats.filter(m => !inv[m]).length;
+    const linhas = mats.map(m => `<tr>
+        <td>${esc(m)}</td><td>${esc(db.materiais[m].unidade)}</td>
+        <td>${inv[m] ? fmtData(inv[m].data) : '—'}</td>
+        <td class="num">${inv[m] ? fmt(inv[m].qtd) : '—'}</td>
+        <td class="num">${fmt(mov[m].Entrada)}</td><td class="num">${fmt(mov[m].Saida)}</td><td class="num">${fmt(mov[m].Retorno)}</td>
+        <td class="num"><strong>${fmt(atual[m] || 0)}</strong></td>
+      </tr>`).join('');
+    const corpo = `<table>
+        <thead><tr><th>Material</th><th>Un.</th><th>Data da contagem</th><th class="num">Qtd contada</th>
+        <th class="num">Entradas</th><th class="num">Saídas</th><th class="num">Retornos</th><th class="num">Saldo atual</th></tr></thead>
+        <tbody>${linhas}</tbody></table>
+      ${semContagem ? `<p class="obs">${semContagem} material(is) ainda sem contagem física registrada.</p>` : ''}
+      <p class="obs">Saldo atual = quantidade contada + entradas + retornos − saídas, a partir da data da contagem.</p>`;
+    imprimir(moldura('Inventário de Estoque', `Posição em ${fmtData(hoje())} · movimentações do período ${descPeriodo(p)}`,
+      corpo, ['Responsável pela contagem', 'Encarregado de via', 'Fiscalização / Cliente']));
+  }
+
+  function pdfFolhaContagem() {
+    const mats = Object.keys(db.materiais);
+    if (!mats.length) return alert('Cadastre os materiais antes de gerar a folha.');
+    const linhas = mats.map(m => `<tr>
+        <td>${esc(m)}</td><td>${esc(db.materiais[m].unidade)}</td>
+        <td class="vazio"></td><td class="vazio"></td></tr>`).join('');
+    const corpo = `<table>
+        <thead><tr><th style="width:42%">Material</th><th style="width:8%">Un.</th>
+        <th style="width:20%">Qtd contada</th><th>Observação</th></tr></thead>
+        <tbody>${linhas}</tbody></table>
+      <p class="obs">Preencher à caneta durante a contagem no pátio e lançar no sistema em seguida.</p>`;
+    imprimir(moldura('Folha de Contagem Física', `Data da contagem: ____ / ____ / ________ · Local: ______________________`,
+      corpo, ['Responsável pela contagem', 'Encarregado de via']));
+  }
+
+  function pdfMedicao(i) {
+    const aberta = i === null;
+    const p = aberta ? periodoAberto() : periodoDoFech(i);
+    const fc = aberta ? null : db.fechamentos[i];
+    const nome = aberta ? 'Período em aberto' : fc.nome;
+    const ini = aberta ? (ultimoFech() ? ultimoFech().saldos : {}) : (i > 0 ? db.fechamentos[i-1].saldos : {});
+    const fim = aberta ? saldos() : fc.saldos;
+    const mov = movDoPeriodoGeral(p);
+    const mats = [...new Set([...Object.keys(db.materiais), ...Object.keys(fim)])].sort();
+    const linhas = mats.map(m => {
+      const x = mov[m] || { Entrada:0, Saida:0, Retorno:0 };
+      const aj = Math.round(((fim[m] || 0) - ((ini[m] || 0) + x.Entrada - x.Saida + x.Retorno)) * 1000) / 1000;
+      return `<tr><td>${esc(m)}</td><td>${esc(db.materiais[m]?.unidade || '')}</td>
+        <td class="num">${fmt(ini[m] || 0)}</td><td class="num">${aj ? fmt(aj) : '—'}</td>
+        <td class="num">${fmt(x.Entrada)}</td>
+        <td class="num">${fmt(x.Saida)}</td><td class="num">${fmt(x.Retorno)}</td>
+        <td class="num"><strong>${fmt(fim[m] || 0)}</strong></td></tr>`;
+    }).join('');
+    const ativos = porAtivo(p);
+    const linhasAtivo = ativos.map(l => `<tr><td>${esc(l.ativo)}</td><td>${esc(l.baliza)}</td>
+      <td>${esc(l.material)}</td><td class="num">${fmt(l.qtd)} ${esc(db.materiais[l.material]?.unidade || '')}</td></tr>`).join('');
+    const corpo = `<h2>Resumo por material</h2>
+      <table><thead><tr><th>Material</th><th>Un.</th><th class="num">Saldo inicial</th><th class="num">Invent./ajuste</th>
+      <th class="num">Entradas</th><th class="num">Saídas</th><th class="num">Retornos</th><th class="num">Saldo final</th></tr></thead>
+      <tbody>${linhas}</tbody></table>
+      <p class="obs">Invent./ajuste = diferença lançada por contagem física dentro do período. Saldo final = saldo inicial + invent./ajuste + entradas − saídas + retornos.</p>
+      <h2>Consumo por ativo (saídas − retornos)</h2>
+      ${linhasAtivo ? `<table><thead><tr><th>Ativo</th><th>Balizamento</th><th>Material</th><th class="num">Quantidade</th></tr></thead>
+        <tbody>${linhasAtivo}</tbody></table>` : '<p class="obs">Sem saídas registradas no período.</p>'}`;
+    imprimir(moldura(aberta ? 'Movimentação do Período em Aberto' : 'Relatório de Medição — ' + nome,
+      `Período: ${descPeriodo(p)}${aberta ? ' (medição ainda não fechada)' : ''}`,
+      corpo, ['Responsável pelo estoque', 'Encarregado de via', 'Fiscalização / Cliente']));
+  }
+  function movDoPeriodoGeral(p) {
+    const mov = {};
+    db.eventos.forEach(ev => {
+      if (!noPeriodo(ev, p)) return;
+      mov[ev.material] = mov[ev.material] || { Entrada:0, Saida:0, Retorno:0 };
+      if (ev.tipo in mov[ev.material]) mov[ev.material][ev.tipo] += ev.qtd;
+    });
+    return mov;
+  }
+
+  $('btnPdfInv').onclick = pdfInventario;
+  $('btnPdfFolha').onclick = pdfFolhaContagem;
+  $('btnPdfAberto').onclick = () => pdfMedicao(null);
+
   document.querySelectorAll('.aba').forEach(b => b.onclick = () => {
     document.querySelectorAll('.aba').forEach(x => x.classList.toggle('ativa', x === b));
     document.querySelectorAll('.painel').forEach(x => x.classList.toggle('ativo', x.id === 'painel-' + b.dataset.aba));
@@ -542,5 +711,6 @@
   render();
 })();
 </script>
+<div id="relatorio"></div>
 </body>
 </html>
