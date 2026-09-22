@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estoque Prumo - Via Permanente</title>
+<style>
+  :root { --bg:#1e1e24; --card:#2b2b36; --borda:#4D2B24; --lar:#F18321; --txt:#fff; --sub:#aaa; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--txt); padding: 16px; margin: 0; }
+  .dashboard { max-width: 1000px; margin: auto; background: var(--card); padding: 24px; border-radius: 12px; border: 2px solid var(--borda); }
+  h1 { text-align: center; color: var(--lar); margin: 0 0 4px; text-transform: uppercase; letter-spacing: 1px; font-size: 1.5em; }
+  .subtitulo { text-align: center; color: var(--sub); margin: 0 0 20px; font-size: .9em; }
+  h2 { color: var(--lar); border-bottom: 1px solid var(--borda); padding-bottom: 8px; font-size: 1.15em; margin-top: 28px; }
+
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+  .card { background: var(--bg); border: 1px solid var(--borda); border-left: 5px solid var(--lar); padding: 14px; border-radius: 8px; text-align: center; }
+  .card h3 { margin: 0 0 6px; color: var(--sub); font-size: .8em; text-transform: uppercase; font-weight: 600; }
+  .card .value { font-size: 1.6em; font-weight: bold; color: var(--lar); }
+
+  .abas { display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 2px solid var(--borda); margin-bottom: 16px; }
+  .aba { background: none; border: none; color: var(--sub); padding: 10px 14px; cursor: pointer; font-weight: bold; font-size: .95em; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+  .aba.ativa { color: var(--lar); border-bottom-color: var(--lar); }
+  .painel { display: none; } .painel.ativo { display: block; }
+
+  .form-group { margin-bottom: 12px; }
+  label { display: block; margin-bottom: 5px; font-weight: bold; font-size: .85em; color: #ccc; }
+  input, select, textarea { width: 100%; padding: 10px; background: var(--bg); border: 1px solid var(--borda); color: #fff; border-radius: 4px; font-size: 1em; font-family: inherit; }
+  input:focus, select:focus { outline: none; border-color: var(--lar); }
+
+  .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: #fff; font-size: .95em; }
+  .btn:hover { filter: brightness(1.2); }
+  .btn-primary { background: var(--lar); color: var(--bg); width: 100%; }
+  .btn-laranja { background: var(--lar); color: var(--bg); }
+  .btn-success { background: #28a745; }
+  .btn-info { background: #17a2b8; }
+  .btn-sm { padding: 6px 10px; font-size: .85em; }
+  .btn-danger { background: #dc3545; padding: 5px 10px; font-size: .8em; }
+
+  .table-responsive { overflow-x: auto; margin-bottom: 20px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: .9em; }
+  th, td { padding: 10px; text-align: left; border-bottom: 1px solid var(--borda); white-space: nowrap; }
+  th { background: var(--bg); color: var(--lar); }
+  td.num, th.num { text-align: right; }
+  tr:hover { background: #333340; }
+  .neg { color: #ff6b6b !important; }
+
+  .badge { padding: 3px 8px; border-radius: 4px; font-size: .8em; font-weight: bold; color: #fff; }
+  .bg-Entrada { background: #28a745; } .bg-Saida { background: #dc3545; }
+  .bg-Retorno { background: #ffc107; color: #000; } .bg-Inventario { background: #17a2b8; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid-3 { display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 10px; align-items: end; }
+  .filtros { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .aviso { background: #3a2a1a; border: 1px solid var(--lar); color: #ffd3a8; padding: 10px 12px; border-radius: 6px; font-size: .9em; margin-bottom: 14px; }
+  .muted { color: var(--sub); font-size: .85em; }
+  .linha-acoes { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .hidden { display: none !important; }
+
+  @media (max-width: 640px) {
+    body { padding: 8px; } .dashboard { padding: 14px; }
+    .cards, .grid-2, .grid-3, .filtros { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="dashboard">
+  <h1>Gestão de Estoque Prumo</h1>
+  <p class="subtitulo">Via Permanente · Controle físico por medição</p>
+
+  <div class="cards">
+    <div class="card"><h3>Medição em aberto</h3><div class="value" id="cardPeriodo">-</div></div>
+    <div class="card"><h3>Saídas no período</h3><div class="value" id="cardSaidas">0</div></div>
+    <div class="card"><h3>Materiais cadastrados</h3><div class="value" id="cardMateriais">0</div></div>
+  </div>
+
+  <nav class="abas">
+    <button class="aba ativa" data-aba="estoque">Estoque</button>
+    <button class="aba" data-aba="lancar">Lançar</button>
+    <button class="aba" data-aba="historico">Histórico</button>
+    <button class="aba" data-aba="medicoes">Medições</button>
+    <button class="aba" data-aba="backup">Backup</button>
+  </nav>
+
+  <!-- ESTOQUE -->
+  <section class="painel ativo" id="painel-estoque">
+    <div class="aviso" id="avisoInventario">
+      <strong>Primeiro passo:</strong> faça o inventário físico. Clique em <em>Inventário</em> em cada material e informe a quantidade contada no pátio.
+      Depois disso, lance só as Entradas, Saídas e Retornos.
+    </div>
+    <div class="table-responsive">
+      <table>
+        <thead><tr>
+          <th>Material</th><th>Un.</th><th class="num">Saldo inicial</th><th class="num">Entradas</th>
+          <th class="num">Saídas</th><th class="num">Retornos</th><th class="num">Saldo atual</th><th>Ação</th>
+        </tr></thead>
+        <tbody id="tabelaEstoque"></tbody>
+      </table>
+      <p class="muted">Saldo inicial = saldo no último fechamento de medição (ou zero). Movimentos contados a partir daí.</p>
+    </div>
+
+    <h2>Cadastrar novo material</h2>
+    <div class="grid-3">
+      <div><label>Nome do material</label><input type="text" id="novoNome" placeholder="Ex.: ARRUELA DE PRESSÃO"></div>
+      <div><label>Unidade</label><input type="text" id="novoUn" value="UN"></div>
+      <div><label>Qtd contada</label><input type="number" id="novoQtd" value="0" step="0.01" min="0"></div>
+      <div><button class="btn btn-laranja" id="btnNovo">➕ Adicionar</button></div>
+    </div>
+  </section>
+
+  <!-- LANÇAR -->
+  <section class="painel" id="painel-lancar">
+    <form id="formMov">
+      <div class="grid-2">
+        <div class="form-group"><label>Data</label><input type="date" id="dataMov" required></div>
+        <div class="form-group"><label>Tipo de movimentação</label>
+          <select id="tipo" required>
+            <option value="">Selecione...</option>
+            <option value="Entrada">Entrada (recebimento)</option>
+            <option value="Saida">Saída / baixa (uso na área)</option>
+            <option value="Retorno">Retorno (voltou sem usar)</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label>Material</label><select id="material" required></select></div>
+        <div class="form-group"><label>Quantidade <span id="unLanc" class="muted"></span></label>
+          <input type="number" id="quantidade" step="0.01" min="0.01" required></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label>Responsável</label><input type="text" id="responsavel" required></div>
+        <div class="form-group"><label>Matrícula</label><input type="text" id="matricula" required></div>
+      </div>
+      <div id="camposOp" class="grid-2 hidden">
+        <div class="form-group"><label>Ativo (equipamento / trecho)</label><input type="text" id="ativo"></div>
+        <div class="form-group"><label>Balizamento</label><input type="text" id="balizamento"></div>
+      </div>
+      <div class="form-group"><label>Observação (NF, OS, laudo…)</label><input type="text" id="obs"></div>
+      <button type="submit" class="btn btn-primary">Registrar</button>
+    </form>
+  </section>
+
+  <!-- HISTÓRICO -->
+  <section class="painel" id="painel-historico">
+    <div class="filtros">
+      <div><label>Período</label><select id="fPeriodo"></select></div>
+      <div><label>Tipo</label>
+        <select id="fTipo"><option value="">Todos</option><option>Entrada</option><option value="Saida">Saída</option><option>Retorno</option><option value="Inventario">Inventário</option></select>
+      </div>
+      <div><label>Material</label><select id="fMaterial"></select></div>
+    </div>
+    <div class="table-responsive">
+      <table>
+        <thead><tr><th>Data</th><th>Tipo</th><th>Material</th><th class="num">Qtd</th><th>Ativo / Balizamento</th><th>Responsável</th><th>Obs.</th><th></th></tr></thead>
+        <tbody id="tabelaHistorico"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- MEDIÇÕES -->
+  <section class="painel" id="painel-medicoes">
+    <div class="aviso">
+      Ao fechar a medição, o saldo de cada material é congelado nessa data. Tudo lançado com data posterior entra na próxima medição.
+    </div>
+    <div class="grid-3" style="grid-template-columns: 2fr 1fr auto;">
+      <div><label>Nome da medição</label><input type="text" id="nomeMedicao" placeholder="Ex.: MEDIÇÃO 09/2026"></div>
+      <div><label>Data de corte</label><input type="date" id="dataMedicao"></div>
+      <div><button class="btn btn-laranja" id="btnFechar">🔒 Fechar medição</button></div>
+    </div>
+
+    <h2>Saídas do período em aberto por ativo</h2>
+    <div class="table-responsive">
+      <table><thead><tr><th>Ativo</th><th>Balizamento</th><th>Material</th><th class="num">Qtd líquida</th></tr></thead>
+      <tbody id="tabelaPorAtivo"></tbody></table>
+    </div>
+
+    <h2>Medições fechadas</h2>
+    <div class="table-responsive">
+      <table><thead><tr><th>Medição</th><th>Período</th><th class="num">Lançamentos</th><th>Ações</th></tr></thead>
+      <tbody id="tabelaMedicoes"></tbody></table>
+    </div>
+  </section>
+
+  <!-- BACKUP -->
+  <section class="painel" id="painel-backup">
+    <div class="aviso">
+      Os dados ficam salvos <strong>neste navegador, neste aparelho</strong>. Outro celular ou computador começa vazio.
+      Faça backup com frequência e use <em>Importar</em> para levar os dados para outro aparelho.
+    </div>
+    <div class="linha-acoes">
+      <button class="btn btn-success" id="btnCsvEstoque">⬇ Saldo atual (Excel)</button>
+      <button class="btn btn-success" id="btnCsvHist">⬇ Histórico completo (Excel)</button>
+      <button class="btn btn-info" id="btnBackup">💾 Baixar backup (.json)</button>
+      <label class="btn btn-laranja" style="margin:0; display:inline-block; color:var(--bg);">📂 Importar backup
+        <input type="file" id="fileImport" accept=".json,application/json" class="hidden">
+      </label>
+    </div>
+    <p class="muted" id="infoBackup"></p>
+  </section>
+</div>
+
+<script>
+(() => {
+  const CHAVE = 'prumoEstoque_v2';
+  const PADRAO = [
+    ['DORMENTES','UN'], ['PLACAS DE APOIO','UN'], ['GRAMPOS TIPO PADROL','UN'], ['TIREFONDS','UN'],
+    ['BRITA 3#','M³'], ['TRILHO NOVO','UN'], ['TRILHO SEMINOVO','UN'], ['TALAS DE JUNÇÃO','UN'],
+    ['PARAFUSOS PARA TALAS DE JUNÇÃO','UN']
+  ];
+  const $ = id => document.getElementById(id);
+  const hoje = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
+  const fmt = n => (Number(n) || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+  const fmtData = s => s ? s.split('-').reverse().join('/') : '-';
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const TIPO_LABEL = { Entrada:'Entrada', Saida:'Saída', Retorno:'Retorno', Inventario:'Inventário' };
+  let seq = 0; const novoId = () => Date.now() * 100 + (seq++ % 100);
+
+  // ---------- dados ----------
+  function carregar() {
+    try { const s = localStorage.getItem(CHAVE); if (s) return normalizar(JSON.parse(s)); } catch (e) {}
+    return migrarVersaoAntiga();
+  }
+  function normalizar(d) {
+    d.materiais = d.materiais || {}; d.eventos = d.eventos || []; d.fechamentos = d.fechamentos || [];
+    return d;
+  }
+  function migrarVersaoAntiga() {
+    const base = { materiais: {}, eventos: [], fechamentos: [] };
+    PADRAO.forEach(([n,u]) => base.materiais[n] = { unidade: u });
+    try {
+      const est = JSON.parse(localStorage.getItem('estoquePrumo_Dark') || 'null');
+      const hist = JSON.parse(localStorage.getItem('historicoPrumo_Dark') || '[]');
+      if (est) Object.keys(est).forEach(n => { if (!base.materiais[n]) base.materiais[n] = { unidade: 'UN' }; });
+      hist.forEach(r => base.eventos.push({
+        id: r.id, data: r.data, tipo: r.tipo === 'Ajuste Inicial' ? 'Inventario' : r.tipo,
+        material: r.material, qtd: Number(r.qtd) || 0, responsavel: r.responsavel || '', matricula: r.matricula || '',
+        ativo: r.ativo === 'Inventário Físico' ? '' : (r.ativo || ''), balizamento: r.balizamento || '', obs: ''
+      }));
+    } catch (e) {}
+    return base;
+  }
+  let db = carregar();
+  function salvar() {
+    try { localStorage.setItem(CHAVE, JSON.stringify(db)); }
+    catch (e) { alert('Não foi possível salvar neste navegador (modo anônimo?). Baixe um backup agora.'); }
+  }
+
+  const ordenados = () => [...db.eventos].sort((a,b) => a.data < b.data ? -1 : a.data > b.data ? 1 : a.id - b.id);
+  const ultimoFech = () => db.fechamentos.length ? db.fechamentos[db.fechamentos.length - 1] : null;
+
+  // saldo de cada material considerando eventos com data <= ate (ou todos)
+  function saldos(ate) {
+    const s = {}; Object.keys(db.materiais).forEach(m => s[m] = 0);
+    ordenados().forEach(ev => {
+      if (ate && ev.data > ate) return;
+      if (!(ev.material in s)) s[ev.material] = 0;
+      if (ev.tipo === 'Inventario') s[ev.material] = ev.qtd;
+      else if (ev.tipo === 'Entrada' || ev.tipo === 'Retorno') s[ev.material] += ev.qtd;
+      else if (ev.tipo === 'Saida') s[ev.material] -= ev.qtd;
+    });
+    Object.keys(s).forEach(k => s[k] = Math.round(s[k] * 1000) / 1000);
+    return s;
+  }
+  // período: {de (exclusivo), ate (inclusivo)}
+  function periodoAberto() { const f = ultimoFech(); return { de: f ? f.data : null, ate: null }; }
+  function periodoDoFech(i) { return { de: i > 0 ? db.fechamentos[i-1].data : null, ate: db.fechamentos[i].data }; }
+  const noPeriodo = (ev, p) => (!p.de || ev.data > p.de) && (!p.ate || ev.data <= p.ate);
+
+  // ---------- UI ----------
+  function render() {
+    const p = periodoAberto();
+    const f = ultimoFech();
+    const atual = saldos();
+    const inicial = f ? f.saldos : {};
+    const mov = {};
+    Object.keys(db.materiais).forEach(m => mov[m] = { Entrada:0, Saida:0, Retorno:0 });
+    let totalSaidas = 0;
+    db.eventos.forEach(ev => {
+      if (!noPeriodo(ev, p) || !mov[ev.material] || !(ev.tipo in mov[ev.material])) return;
+      mov[ev.material][ev.tipo] += ev.qtd;
+      if (ev.tipo === 'Saida') totalSaidas++;
+    });
+
+    $('tabelaEstoque').innerHTML = Object.keys(db.materiais).map((m, i) => {
+      const un = db.materiais[m].unidade, sa = atual[m] || 0;
+      return `<tr>
+        <td><strong>${esc(m)}</strong></td><td>${esc(un)}</td>
+        <td class="num">${fmt(inicial[m] || 0)}</td>
+        <td class="num">${fmt(mov[m].Entrada)}</td><td class="num">${fmt(mov[m].Saida)}</td><td class="num">${fmt(mov[m].Retorno)}</td>
+        <td class="num ${sa < 0 ? 'neg' : ''}" style="color:var(--lar);font-size:1.05em"><strong>${fmt(sa)}</strong></td>
+        <td class="linha-acoes">
+          <button class="btn btn-laranja btn-sm" data-inv="${i}">✏️ Inventário</button>
+          <button class="btn btn-danger" data-delmat="${i}" title="Remover material">X</button>
+        </td></tr>`;
+    }).join('') || '<tr><td colspan="8" class="muted">Nenhum material cadastrado.</td></tr>';
+
+    $('avisoInventario').classList.toggle('hidden', db.eventos.some(e => e.tipo === 'Inventario'));
+    $('cardPeriodo').textContent = f ? 'após ' + fmtData(f.data) : 'Primeira';
+    $('cardSaidas').textContent = totalSaidas;
+    $('cardMateriais').textContent = Object.keys(db.materiais).length;
+
+    // selects
+    const mats = Object.keys(db.materiais);
+    const selMat = $('material'), selF = $('fMaterial');
+    const vMat = selMat.value, vF = selF.value;
+    selMat.innerHTML = '<option value="">Selecione o material...</option>' + mats.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+    selF.innerHTML = '<option value="">Todos</option>' + mats.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+    selMat.value = vMat; selF.value = vF;
+
+    const selP = $('fPeriodo'), vP = selP.value || 'aberto';
+    selP.innerHTML = '<option value="aberto">Medição em aberto</option><option value="todos">Todos</option>' +
+      db.fechamentos.map((fc, i) => `<option value="${i}">${esc(fc.nome)}</option>`).reverse().join('');
+    selP.value = [...selP.options].some(o => o.value === vP) ? vP : 'aberto';
+
+    renderHistorico(); renderMedicoes();
+    $('infoBackup').textContent = `${db.eventos.length} lançamentos · ${db.fechamentos.length} medições fechadas.`;
+  }
+
+  function periodoSelecionado() {
+    const v = $('fPeriodo').value;
+    if (v === 'todos') return { de: null, ate: null };
+    if (v === 'aberto' || v === '') return periodoAberto();
+    return periodoDoFech(Number(v));
+  }
+
+  function renderHistorico() {
+    const p = periodoSelecionado(), ft = $('fTipo').value, fm = $('fMaterial').value;
+    const lista = ordenados().reverse().filter(ev => noPeriodo(ev, p) && (!ft || ev.tipo === ft) && (!fm || ev.material === fm));
+    $('tabelaHistorico').innerHTML = lista.map(ev => {
+      const local = (ev.ativo || ev.balizamento) ? `${esc(ev.ativo || '-')} / ${esc(ev.balizamento || '-')}` : '-';
+      const resp = ev.matricula && ev.matricula !== '-' ? `${esc(ev.responsavel)} (${esc(ev.matricula)})` : esc(ev.responsavel);
+      return `<tr><td>${fmtData(ev.data)}</td><td><span class="badge bg-${ev.tipo}">${TIPO_LABEL[ev.tipo] || esc(ev.tipo)}</span></td>
+        <td>${esc(ev.material)}</td><td class="num"><strong>${fmt(ev.qtd)}</strong></td><td>${local}</td><td>${resp}</td>
+        <td>${esc(ev.obs || '')}</td><td><button class="btn btn-danger" data-delev="${ev.id}">X</button></td></tr>`;
+    }).join('') || '<tr><td colspan="8" class="muted">Nenhum lançamento neste filtro.</td></tr>';
+  }
+
+  function porAtivo(p) {
+    const g = {};
+    db.eventos.forEach(ev => {
+      if (!noPeriodo(ev, p) || (ev.tipo !== 'Saida' && ev.tipo !== 'Retorno')) return;
+      const k = [ev.ativo || '-', ev.balizamento || '-', ev.material].join('||');
+      g[k] = (g[k] || 0) + (ev.tipo === 'Saida' ? ev.qtd : -ev.qtd);
+    });
+    return Object.entries(g).map(([k, q]) => { const [a,b,m] = k.split('||'); return { ativo:a, baliza:b, material:m, qtd:q }; })
+      .sort((x,y) => x.ativo.localeCompare(y.ativo) || x.baliza.localeCompare(y.baliza) || x.material.localeCompare(y.material));
+  }
+
+  function renderMedicoes() {
+    const linhas = porAtivo(periodoAberto());
+    $('tabelaPorAtivo').innerHTML = linhas.map(l => `<tr><td>${esc(l.ativo)}</td><td>${esc(l.baliza)}</td><td>${esc(l.material)}</td>
+      <td class="num">${fmt(l.qtd)} ${esc(db.materiais[l.material]?.unidade || '')}</td></tr>`).join('')
+      || '<tr><td colspan="4" class="muted">Sem saídas no período em aberto.</td></tr>';
+
+    $('tabelaMedicoes').innerHTML = db.fechamentos.map((fc, i) => {
+      const p = periodoDoFech(i), n = db.eventos.filter(ev => noPeriodo(ev, p)).length;
+      const ult = i === db.fechamentos.length - 1;
+      return `<tr><td><strong>${esc(fc.nome)}</strong></td><td>${p.de ? 'após ' + fmtData(p.de) : 'início'} até ${fmtData(p.ate)}</td>
+        <td class="num">${n}</td><td class="linha-acoes">
+          <button class="btn btn-success btn-sm" data-csvmed="${i}">⬇ Relatório</button>
+          ${ult ? `<button class="btn btn-danger" data-reabrir="${i}">Reabrir</button>` : ''}</td></tr>`;
+    }).reverse().join('') || '<tr><td colspan="4" class="muted">Nenhuma medição fechada ainda.</td></tr>';
+  }
+
+  // ---------- ações ----------
+  function inventario(nomeMat) {
+    const atual = saldos()[nomeMat] || 0;
+    const v = prompt(`INVENTÁRIO FÍSICO\n\nQuantidade contada no pátio para:\n${nomeMat}\n\n(saldo no sistema: ${fmt(atual)})`, atual);
+    if (v === null || v.trim() === '') return;
+    const q = parseFloat(v.replace(/\./g, '').replace(',', '.'));
+    const qtd = v.includes(',') ? q : parseFloat(v);
+    if (isNaN(qtd) || qtd < 0) return alert('Quantidade inválida.');
+    const data = prompt('Data da contagem (DD/MM/AAAA):', fmtData(hoje()));
+    if (data === null) return;
+    const m = data.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!m) return alert('Data inválida. Use DD/MM/AAAA.');
+    const iso = `${m[3]}-${m[2]}-${m[1]}`;
+    if (!confirmaPeriodoFechado(iso)) return;
+    db.eventos.push({ id: novoId(), data: iso, tipo: 'Inventario', material: nomeMat, qtd,
+      responsavel: 'INVENTÁRIO', matricula: '-', ativo: '', balizamento: '', obs: 'Contagem física' });
+    salvar(); render();
+  }
+
+  function confirmaPeriodoFechado(data) {
+    const f = ultimoFech();
+    if (f && data <= f.data) return confirm(`Atenção: a data ${fmtData(data)} está dentro da medição já fechada "${f.nome}". Lançar mesmo assim? (os saldos congelados dessa medição não mudam)`);
+    return true;
+  }
+
+  $('btnNovo').onclick = () => {
+    const nome = $('novoNome').value.trim().toUpperCase();
+    const un = $('novoUn').value.trim().toUpperCase() || 'UN';
+    const qtd = parseFloat($('novoQtd').value) || 0;
+    if (!nome) return alert('Informe o nome do material.');
+    if (db.materiais[nome]) return alert('Esse material já existe.');
+    db.materiais[nome] = { unidade: un };
+    if (qtd > 0) db.eventos.push({ id: novoId(), data: hoje(), tipo: 'Inventario', material: nome, qtd,
+      responsavel: 'CADASTRO', matricula: '-', ativo: '', balizamento: '', obs: 'Cadastro inicial' });
+    salvar(); render();
+    $('novoNome').value = ''; $('novoUn').value = 'UN'; $('novoQtd').value = '0';
+  };
+
+  $('tabelaEstoque').onclick = e => {
+    const mats = Object.keys(db.materiais);
+    const bi = e.target.closest('[data-inv]'), bd = e.target.closest('[data-delmat]');
+    if (bi) inventario(mats[+bi.dataset.inv]);
+    if (bd) {
+      const m = mats[+bd.dataset.delmat];
+      const n = db.eventos.filter(ev => ev.material === m).length;
+      if (n) return alert(`"${m}" tem ${n} lançamentos. Exclua os lançamentos antes de remover o material.`);
+      if (confirm(`Remover o material "${m}"?`)) { delete db.materiais[m]; salvar(); render(); }
+    }
+  };
+
+  function toggleCampos() {
+    const t = $('tipo').value, op = t === 'Saida' || t === 'Retorno';
+    $('camposOp').classList.toggle('hidden', !op);
+    $('ativo').required = op; $('balizamento').required = op;
+  }
+  $('tipo').onchange = toggleCampos;
+  $('material').onchange = () => { const m = db.materiais[$('material').value]; $('unLanc').textContent = m ? `(${m.unidade})` : ''; };
+
+  $('formMov').onsubmit = e => {
+    e.preventDefault();
+    const tipo = $('tipo').value, data = $('dataMov').value, material = $('material').value;
+    const qtd = parseFloat($('quantidade').value);
+    if (!tipo || !material || !(qtd > 0)) return;
+    if (!confirmaPeriodoFechado(data)) return;
+    if (tipo === 'Saida') {
+      const s = saldos(data)[material] || 0;
+      if (s < qtd && !confirm(`Atenção: a saída (${fmt(qtd)}) é maior que o saldo em ${fmtData(data)} (${fmt(s)}). Continuar e deixar negativo?`)) return;
+    }
+    const op = tipo !== 'Entrada';
+    db.eventos.push({ id: novoId(), data, tipo, material, qtd,
+      responsavel: $('responsavel').value.trim().toUpperCase(), matricula: $('matricula').value.trim(),
+      ativo: op ? $('ativo').value.trim().toUpperCase() : '', balizamento: op ? $('balizamento').value.trim().toUpperCase() : '',
+      obs: $('obs').value.trim() });
+    salvar(); render();
+    // mantém responsável/matrícula/data para lançar vários em sequência
+    const keep = { r: $('responsavel').value, m: $('matricula').value, d: data, t: tipo, a: $('ativo').value, b: $('balizamento').value };
+    $('formMov').reset();
+    $('responsavel').value = keep.r; $('matricula').value = keep.m; $('dataMov').value = keep.d; $('tipo').value = keep.t;
+    $('ativo').value = keep.a; $('balizamento').value = keep.b; toggleCampos(); $('unLanc').textContent = '';
+    $('material').focus();
+  };
+
+  $('tabelaHistorico').onclick = e => {
+    const b = e.target.closest('[data-delev]'); if (!b) return;
+    const id = Number(b.dataset.delev), ev = db.eventos.find(x => x.id === id); if (!ev) return;
+    const f = ultimoFech();
+    const msg = f && ev.data <= f.data ? `Este lançamento pertence a uma medição fechada. Excluir mesmo assim? (os saldos congelados não mudam)` : 'Excluir este lançamento? O saldo será recalculado.';
+    if (confirm(msg)) { db.eventos = db.eventos.filter(x => x.id !== id); salvar(); render(); }
+  };
+  ['fPeriodo','fTipo','fMaterial'].forEach(id => $(id).onchange = renderHistorico);
+
+  $('btnFechar').onclick = () => {
+    const nome = $('nomeMedicao').value.trim().toUpperCase(), data = $('dataMedicao').value;
+    if (!nome || !data) return alert('Informe o nome e a data de corte da medição.');
+    const f = ultimoFech();
+    if (f && data <= f.data) return alert(`A data de corte precisa ser posterior ao último fechamento (${fmtData(f.data)}).`);
+    const depois = db.eventos.filter(ev => ev.data > data).length;
+    if (!confirm(`Fechar "${nome}" com corte em ${fmtData(data)}?${depois ? `\n\n${depois} lançamento(s) com data posterior ficarão para a próxima medição.` : ''}`)) return;
+    db.fechamentos.push({ id: novoId(), nome, data, saldos: saldos(data), fechadoEm: new Date().toISOString() });
+    salvar(); render();
+    exportarMedicao(db.fechamentos.length - 1);
+    $('nomeMedicao').value = '';
+  };
+
+  $('tabelaMedicoes').onclick = e => {
+    const c = e.target.closest('[data-csvmed]'), r = e.target.closest('[data-reabrir]');
+    if (c) exportarMedicao(+c.dataset.csvmed);
+    if (r && confirm('Reabrir esta medição? Os lançamentos voltam para o período em aberto.')) { db.fechamentos.pop(); salvar(); render(); }
+  };
+
+  // ---------- exportação ----------
+  const cel = v => { const s = String(v ?? ''); return /[;"\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; };
+  const num = n => String(Math.round((Number(n) || 0) * 1000) / 1000).replace('.', ',');
+  function baixar(nome, conteudo, tipo) {
+    const blob = new Blob([conteudo], { type: tipo });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  function linhasMov(p) {
+    let s = 'Data;Tipo;Material;Unidade;Quantidade;Responsavel;Matricula;Ativo;Balizamento;Observacao\n';
+    ordenados().filter(ev => noPeriodo(ev, p)).forEach(ev => {
+      s += [fmtData(ev.data), TIPO_LABEL[ev.tipo] || ev.tipo, ev.material, db.materiais[ev.material]?.unidade || '', num(ev.qtd),
+        ev.responsavel, ev.matricula, ev.ativo || '-', ev.balizamento || '-', ev.obs || ''].map(cel).join(';') + '\n';
+    });
+    return s;
+  }
+  function exportarMedicao(i) {
+    const fc = db.fechamentos[i], p = periodoDoFech(i);
+    const ini = i > 0 ? db.fechamentos[i-1].saldos : {};
+    const mov = {};
+    db.eventos.forEach(ev => { if (!noPeriodo(ev, p)) return; mov[ev.material] = mov[ev.material] || { Entrada:0, Saida:0, Retorno:0 };
+      if (ev.tipo in mov[ev.material]) mov[ev.material][ev.tipo] += ev.qtd; });
+    let s = '\uFEFF' + cel('PRUMO ENGENHARIA - ' + fc.nome) + '\n';
+    s += `Periodo;${p.de ? 'apos ' + fmtData(p.de) : 'inicio'} ate ${fmtData(p.ate)}\n\n`;
+    s += 'RESUMO POR MATERIAL\nMaterial;Unidade;Saldo inicial;Entradas;Saidas;Retornos;Saldo final\n';
+    const mats = new Set([...Object.keys(db.materiais), ...Object.keys(fc.saldos)]);
+    mats.forEach(m => { const x = mov[m] || { Entrada:0, Saida:0, Retorno:0 };
+      s += [m, db.materiais[m]?.unidade || '', num(ini[m]), num(x.Entrada), num(x.Saida), num(x.Retorno), num(fc.saldos[m])].map(cel).join(';') + '\n'; });
+    s += '\nCONSUMO POR ATIVO (saidas - retornos)\nAtivo;Balizamento;Material;Quantidade\n';
+    porAtivo(p).forEach(l => s += [l.ativo, l.baliza, l.material, num(l.qtd)].map(cel).join(';') + '\n');
+    s += '\nLANCAMENTOS\n' + linhasMov(p);
+    baixar(`Medicao_${fc.nome.replace(/[^\w-]+/g,'_')}.csv`, s, 'text/csv;charset=utf-8;');
+  }
+  $('btnCsvEstoque').onclick = () => {
+    const a = saldos();
+    let s = '\uFEFFMaterial;Unidade;Saldo atual\n';
+    Object.keys(db.materiais).forEach(m => s += [m, db.materiais[m].unidade, num(a[m])].map(cel).join(';') + '\n');
+    baixar(`Saldo_Estoque_Prumo_${hoje()}.csv`, s, 'text/csv;charset=utf-8;');
+  };
+  $('btnCsvHist').onclick = () => {
+    if (!db.eventos.length) return alert('Sem lançamentos.');
+    baixar(`Historico_Estoque_Prumo_${hoje()}.csv`, '\uFEFF' + linhasMov({ de:null, ate:null }), 'text/csv;charset=utf-8;');
+  };
+  $('btnBackup').onclick = () => baixar(`Backup_Estoque_Prumo_${hoje()}.json`, JSON.stringify({ app: 'estoque-prumo', versao: 2, ...db }, null, 1), 'application/json');
+  $('fileImport').onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const d = JSON.parse(r.result);
+        if (!d.materiais || !Array.isArray(d.eventos)) throw new Error();
+        if (!confirm(`Importar backup com ${d.eventos.length} lançamentos? Os dados atuais deste aparelho serão SUBSTITUÍDOS.`)) return;
+        delete d.app; delete d.versao; db = normalizar(d); salvar(); render(); alert('Backup importado.');
+      } catch (err) { alert('Arquivo de backup inválido.'); }
+      e.target.value = '';
+    };
+    r.readAsText(f);
+  };
+
+  // abas
+  document.querySelectorAll('.aba').forEach(b => b.onclick = () => {
+    document.querySelectorAll('.aba').forEach(x => x.classList.toggle('ativa', x === b));
+    document.querySelectorAll('.painel').forEach(x => x.classList.toggle('ativo', x.id === 'painel-' + b.dataset.aba));
+  });
+
+  $('dataMov').value = hoje(); $('dataMedicao').value = hoje();
+  if (!localStorage.getItem(CHAVE)) salvar();
+  render();
+})();
+</script>
+</body>
+</html>
